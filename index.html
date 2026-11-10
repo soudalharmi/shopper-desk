@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Shopper Desk</title>
+<style>
+:root{--bg:#eef0f2;--card:#fff;--ink:#14213d;--mute:#5d6678;--line:#d9dde4;--accent:#14213d;--onaccent:#fff;--gold:#a97a1f;--warn:#b4521b;--warnbg:#fbeadd;--ok:#1f7a4d;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root{--bg:#0e1524;--card:#17213a;--ink:#eef1f7;--mute:#9aa4ba;--line:#2a3654;--accent:#e3b95a;--onaccent:#14213d;--gold:#e3b95a;--warn:#f0a070;--warnbg:#3a2a22;--ok:#5fcf9a}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.45 system-ui,-apple-system,"Segoe UI",sans-serif}
+main{max-width:640px;margin:0 auto;padding:16px 16px 96px}
+[hidden]{display:none!important}
+h1{font:600 28px/1.1 Georgia,serif;margin:8px 0 4px}
+.sub{color:var(--mute);margin:0 0 16px}
+.head{display:flex;justify-content:space-between;align-items:flex-start;gap:8px}
+.tabs{display:flex;gap:8px;margin-bottom:12px}
+.tab,.chip,.btn{font:inherit;cursor:pointer;color:var(--ink);background:var(--card);border:1px solid var(--line)}
+.tab{flex:1;padding:10px;border-radius:10px;font-weight:500}
+.tab[aria-pressed="true"]{background:var(--accent);color:var(--onaccent);border-color:var(--accent)}
+.chips{display:flex;gap:6px;overflow-x:auto;padding-bottom:8px;margin-bottom:8px}
+.chip{flex:none;padding:6px 12px;border-radius:99px;font-size:14px}
+.chip[aria-pressed="true"]{border-color:var(--gold);box-shadow:inset 0 0 0 1px var(--gold)}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:12px;margin-bottom:10px;display:flex;gap:12px}
+.thumb{width:72px;height:72px;border-radius:10px;background:var(--bg);object-fit:cover;flex:none;display:grid;place-items:center;color:var(--mute);font-size:12px}
+.body{flex:1;min-width:0}
+.top{display:flex;justify-content:space-between;gap:8px}
+.name{font-weight:700;overflow-wrap:anywhere}.price{color:var(--mute);white-space:nowrap}
+.meta{color:var(--mute);font-size:14px;margin:2px 0 6px}
+.badge{display:inline-block;font-size:13px;font-weight:500;padding:2px 9px;border-radius:99px;border:1px solid var(--gold);color:var(--gold)}
+.badge.done{border-color:var(--ok);color:var(--ok)}
+.miss{background:var(--warnbg);color:var(--warn);font-size:13px;padding:5px 9px;border-radius:8px;margin:6px 0}
+.acts{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.btn{padding:7px 11px;border-radius:9px;font-size:14px;font-weight:500;text-decoration:none;display:inline-block}
+.btn.main{background:var(--accent);color:var(--onaccent);border-color:var(--accent)}
+.btn.del{color:var(--warn)}
+.group h2{font:600 19px Georgia,serif;margin:18px 0 8px}
+.pick{display:flex;gap:10px;align-items:center;padding:10px 0;border-bottom:1px solid var(--line)}
+.pick:last-child{border:0}
+.empty{text-align:center;color:var(--mute);padding:36px 12px}
+.fab{position:fixed;right:16px;bottom:calc(16px + env(safe-area-inset-bottom,0px));padding:14px 20px;border-radius:99px;border:0;background:var(--accent);color:var(--onaccent);font:700 16px inherit;box-shadow:0 4px 14px rgba(0,0,0,.25);cursor:pointer}
+dialog{width:min(92vw,460px);max-height:90vh;overflow:auto;border:0;border-radius:16px;padding:18px;background:var(--card);color:var(--ink)}
+dialog::backdrop{background:rgba(0,0,0,.5)}
+label{display:block;font-size:14px;color:var(--mute);margin:10px 0 3px}
+input,textarea{width:100%;padding:10px;border-radius:9px;border:1px solid var(--line);background:var(--bg);color:var(--ink);font:16px inherit}
+.row{display:flex;gap:8px}.row>div{flex:1}
+.login{max-width:360px;margin:12vh auto 0}
+.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:90px;background:var(--ink);color:var(--bg);padding:9px 16px;border-radius:99px;font-size:14px;opacity:0;pointer-events:none;transition:opacity .2s;max-width:90vw;text-align:center}
+.toast.on{opacity:1}
+:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
+</style>
+</head>
+<body>
+<main id="login" class="login" hidden>
+  <h1>Shopper Desk</h1>
+  <p class="sub">Log in to see your orders.</p>
+  <label for="l-email">Email</label><input id="l-email" type="email" autocomplete="username">
+  <label for="l-pass">Password</label><input id="l-pass" type="password" autocomplete="current-password">
+  <div class="acts"><button class="btn main" id="l-go">Log in</button></div>
+</main>
+
+<main id="desk" hidden>
+  <div class="head"><div><h1>Shopper Desk</h1><p class="sub">Every order, customer and status in one place.</p></div>
+  <button class="btn" id="out">Log out</button></div>
+  <div class="tabs">
+    <button class="tab" data-view="orders" aria-pressed="true">Orders</button>
+    <button class="tab" data-view="stores" aria-pressed="false">Shopping list</button>
+  </div>
+  <div class="chips" id="chips"></div>
+  <div id="list"></div>
+  <button class="fab" id="add">+ New order</button>
+</main>
+
+<dialog id="dlg">
+  <h2 id="d-title" style="margin:0 0 4px;font:600 20px Georgia,serif">New order</h2>
+  <div class="newonly">
+    <label for="f-img">Customer’s screenshot</label><input type="file" id="f-img" accept="image/*">
+    <label for="f-msg">Customer’s message (optional)</label><textarea id="f-msg" rows="3" placeholder="Paste what they wrote, e.g. size 38 in black"></textarea>
+  </div>
+  <div class="row">
+    <div><label for="f-cust">Customer</label><input id="f-cust"></div>
+    <div><label for="f-ph">WhatsApp number</label><input id="f-ph" inputmode="tel" placeholder="9715…"></div>
+  </div>
+  <div class="editonly">
+    <div class="row">
+      <div><label for="f-brand">Brand</label><input id="f-brand"></div>
+      <div><label for="f-price">Price (AED)</label><input id="f-price" inputmode="decimal"></div>
+    </div>
+    <label for="f-prod">Product</label><input id="f-prod">
+    <div class="row">
+      <div><label for="f-size">Size</label><input id="f-size"></div>
+      <div><label for="f-color">Color</label><input id="f-color"></div>
+    </div>
+  </div>
+  <div class="acts" style="margin-top:16px;justify-content:flex-end">
+    <button class="btn" id="cancel">Cancel</button>
+    <button class="btn main" id="save">Add order</button>
+  </div>
+</dialog>
+<div class="toast" id="toast"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
+<script>
+var SB_URL='https://gpyyossbvpcfwrvueuls.supabase.co',SB_KEY='sb_publishable_tv9IbZhQF_huqXX_Dh15PQ_LBxsTZ_c',FN='ingest';
+var sb=supabase.createClient(SB_URL,SB_KEY);
+var STAGES=['Requested','Confirmed','Found in store','Paid','Purchased','Delivered'];
+var orders=[],urls={},view='orders',filter='All',imgData='',editId=null,session=null;
+var $=function(i){return document.getElementById(i)};
+function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]})}
+function toast(t){var e=$('toast');e.textContent=t;e.classList.add('on');setTimeout(function(){e.classList.remove('on')},2800)}
+function missing(o){var m=[];if(!o.size)m.push('size');if(!o.color)m.push('color');return m}
+function wa(o,t){return 'https://wa.me/'+String(o.customer_phone||'').replace(/\D/g,'')+'?text='+encodeURIComponent(t)}
+function who(o){return o.customer_name||'there'}
+function ask(o){return 'Hi '+who(o)+', I found your '+(o.brand||'')+' '+(o.product||'item')+'. Which '+missing(o).join(' and ')+' would you like?'}
+function pay(o){return 'Hi '+who(o)+', your '+(o.brand||'')+' '+(o.product||'item')+(o.size?' (size '+o.size+')':'')+(o.color?' in '+o.color:'')+' is confirmed: AED '+(o.price||0)+'. Pay here: [paste your payment link]'}
+
+async function load(){
+  var r=await sb.from('orders').select('*').order('created_at',{ascending:false});
+  if(r.error){toast(r.error.message);return}
+  orders=r.data;urls={};
+  var paths=orders.filter(function(o){return o.image_path}).map(function(o){return o.image_path});
+  if(paths.length){var s=await sb.storage.from('screenshots').createSignedUrls(paths,3600);
+    (s.data||[]).forEach(function(x){if(x.signedUrl)urls[x.path]=x.signedUrl})}
+  render();
+}
+function card(o){
+  var m=missing(o),last=o.stage===5,u=urls[o.image_path];
+  var th=u?'<img class="thumb" alt="Screenshot" src="'+esc(u)+'">':'<div class="thumb">No photo</div>';
+  var a='';
+  if(m.length&&o.customer_phone&&!last)a+='<a class="btn main" target="_blank" rel="noopener" href="'+wa(o,ask(o))+'">Ask '+m.join(' + ')+'</a>';
+  if(!m.length&&o.stage<3)a+='<button class="btn main" data-a="pay" data-id="'+o.id+'">Copy payment message</button>';
+  if(!last)a+='<button class="btn" data-a="next" data-id="'+o.id+'">Mark '+STAGES[o.stage+1].toLowerCase()+'</button>';
+  a+='<button class="btn" data-a="edit" data-id="'+o.id+'">Edit</button><button class="btn del" data-a="del" data-id="'+o.id+'">Remove</button>';
+  return '<div class="card">'+th+'<div class="body"><div class="top"><span class="name">'+esc(o.product||'Item (add details)')+'</span><span class="price">AED '+esc(o.price||0)+'</span></div>'
+   +'<div class="meta">'+esc(o.customer_name||'No name')+' · '+esc(o.brand||'Brand?')+(o.size?' · '+esc(o.size):'')+(o.color?' · '+esc(o.color):'')+'</div>'
+   +'<span class="badge'+(last?' done':'')+'">'+STAGES[o.stage]+'</span>'
+   +(m.length&&!last?'<div class="miss">Still needed: '+m.join(', ')+'</div>':'')
+   +'<div class="acts">'+a+'</div></div></div>'}
+function render(){
+  var c='<button class="chip" data-f="All" aria-pressed="'+(filter==='All')+'">All ('+orders.length+')</button>';
+  STAGES.forEach(function(s,i){var n=orders.filter(function(o){return o.stage===i}).length;
+    c+='<button class="chip" data-f="'+i+'" aria-pressed="'+(String(filter)===String(i))+'">'+s+' ('+n+')</button>'});
+  $('chips').style.display=view==='orders'?'flex':'none';$('chips').innerHTML=c;
+  var out='';
+  if(view==='orders'){
+    var f=orders.filter(function(o){return filter==='All'||String(o.stage)===String(filter)});
+    out=f.length?f.map(card).join(''):'<div class="empty">No orders here yet. Tap “New order” to add one.</div>';
+  }else{
+    var by={};orders.filter(function(o){return o.stage<4}).forEach(function(o){var b=o.brand||'Other';(by[b]=by[b]||[]).push(o)});
+    var k=Object.keys(by);
+    out=k.length?k.map(function(b){return '<div class="group"><h2>'+esc(b)+'</h2><div class="card" style="display:block">'+by[b].map(function(o){
+      return '<div class="pick"><div class="body"><div class="name">'+esc(o.product||'Item')+'</div><div class="meta" style="margin:0">for '+esc(o.customer_name||'?')+(o.size?' · '+esc(o.size):' · size?')+(o.color?' · '+esc(o.color):' · color?')+'</div></div><span class="badge">'+STAGES[o.stage]+'</span></div>'}).join('')+'</div></div>'}).join(''):'<div class="empty">Nothing to look for right now.</div>';
+  }
+  $('list').innerHTML=out;
+}
+
+document.addEventListener('click',async function(e){
+  var t=e.target.closest('button');if(!t)return;
+  if(t.dataset.view){view=t.dataset.view;document.querySelectorAll('.tab').forEach(function(b){b.setAttribute('aria-pressed',b===t)});render();return}
+  if(t.dataset.f!==undefined){filter=t.dataset.f;render();return}
+  var o=orders.filter(function(x){return String(x.id)===t.dataset.id})[0];if(!o)return;
+  if(t.dataset.a==='next'){var r=await sb.from('orders').update({stage:o.stage+1}).eq('id',o.id);if(r.error)toast(r.error.message);load()}
+  if(t.dataset.a==='del'){if(!confirm('Remove this order?'))return;await sb.from('orders').delete().eq('id',o.id);load()}
+  if(t.dataset.a==='pay'){try{await navigator.clipboard.writeText(pay(o));toast('Message copied')}catch(er){toast('Copy not allowed here')}}
+  if(t.dataset.a==='edit'){openDlg(o)}
+});
+
+function openDlg(o){
+  editId=o?o.id:null;imgData='';
+  document.querySelectorAll('.newonly').forEach(function(x){x.hidden=!!o});
+  document.querySelectorAll('.editonly').forEach(function(x){x.hidden=!o});
+  $('d-title').textContent=o?'Edit order':'New order';$('save').textContent=o?'Save changes':'Add order';
+  $('f-img').value='';$('f-msg').value='';
+  $('f-cust').value=o?o.customer_name||'':'';$('f-ph').value=o?o.customer_phone||'':'';
+  $('f-brand').value=o?o.brand||'':'';$('f-prod').value=o?o.product||'':'';
+  $('f-size').value=o?o.size||'':'';$('f-color').value=o?o.color||'':'';$('f-price').value=o&&o.price?o.price:'';
+  $('dlg').showModal();
+}
+$('add').onclick=function(){openDlg(null)};
+$('cancel').onclick=function(){$('dlg').close()};
+$('f-img').onchange=function(e){
+  var file=e.target.files[0];if(!file)return;
+  var r=new FileReader();r.onload=function(){var im=new Image();im.onload=function(){
+    var s=Math.min(1,1280/Math.max(im.width,im.height)),c=document.createElement('canvas');
+    c.width=im.width*s;c.height=im.height*s;c.getContext('2d').drawImage(im,0,0,c.width,c.height);
+    imgData=c.toDataURL('image/jpeg',.8)};im.src=r.result};r.readAsDataURL(file)};
+$('save').onclick=async function(){
+  var b=$('save'),v=function(k){return $('f-'+k).value.trim()};
+  b.disabled=true;
+  try{
+    if(editId){
+      var r=await sb.from('orders').update({customer_name:v('cust')||null,customer_phone:v('ph')||null,brand:v('brand')||null,product:v('prod')||null,size:v('size')||null,color:v('color')||null,price:parseFloat(v('price'))||null}).eq('id',editId);
+      if(r.error)throw new Error(r.error.message);
+    }else{
+      if(!imgData&&!v('msg')){toast('Add a screenshot or the customer’s message');b.disabled=false;return}
+      b.textContent='Reading…';
+      var res=await fetch(SB_URL+'/functions/v1/'+FN,{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+session.access_token,apikey:SB_KEY},
+        body:JSON.stringify({image_base64:imgData?imgData.split(',')[1]:null,media_type:'image/jpeg',message:v('msg'),customer_name:v('cust'),customer_phone:v('ph')})});
+      var d=await res.json();if(!res.ok)throw new Error(d.error||'Server error');
+    }
+    $('dlg').close();await load();
+  }catch(er){toast('Could not save: '+er.message)}
+  b.disabled=false;
+};
+
+$('l-go').onclick=async function(){
+  var r=await sb.auth.signInWithPassword({email:$('l-email').value.trim(),password:$('l-pass').value});
+  if(r.error)toast('Login failed: '+r.error.message);
+};
+$('out').onclick=function(){sb.auth.signOut()};
+function show(){$('login').hidden=!!session;$('desk').hidden=!session;if(session)load()}
+sb.auth.onAuthStateChange(function(ev,s){var was=!!session;session=s;if(!!s!==was)show()});
+sb.auth.getSession().then(function(r){session=r.data.session;show()});
+</script>
+</body>
+</html>
