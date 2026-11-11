@@ -60,9 +60,13 @@ h2{font-size:19px;font-weight:700;letter-spacing:-.02em;margin:24px 4px 10px}
 .ic{width:58px;height:58px;border-radius:50%;display:grid;place-items:center;transition:transform .15s}
 .icons a:active .ic{transform:scale(.94)}
 .ic.wa{background:#25d366}.ic.sc{background:#fffc00}
+.langbar{max-width:560px;margin:0 auto;padding:12px 16px 0;display:flex;justify-content:flex-end}
+[dir="rtl"] *{letter-spacing:0!important}
+[dir="rtl"] input[type="tel"],[dir="rtl"] input[type="password"]{text-align:right}
 </style>
 </head>
 <body>
+<div class="langbar"><button class="btn small" id="lang">العربية</button></div>
 <main id="auth" class="auth" hidden>
   <h1>Welcome</h1>
   <div class="hero"><div class="hl">Personal shopping, made simple</div>
@@ -125,18 +129,54 @@ h2{font-size:19px;font-weight:700;letter-spacing:-.02em;margin:24px 4px 10px}
 <script>
 var SB_URL='https://gpyyossbvpcfwrvueuls.supabase.co',SB_KEY='sb_publishable_tv9IbZhQF_huqXX_Dh15PQ_LBxsTZ_c',SHOPPER='223c6c9a-baca-4fb9-b3e1-6aa48c0405a7';
 var sb=supabase.createClient(SB_URL,SB_KEY);
+var lang='en';try{lang=localStorage.getItem('lang')||((navigator.language||'').indexOf('ar')===0?'ar':'en')}catch(e){}
+var AR={'Welcome':'أهلاً بك','Personal shopping, made simple':'التسوّق الشخصي بكل سهولة',
+'Thank you for choosing our services. Send us the luxury piece you love, we confirm every detail with you and keep you updated until it reaches you.':'شكراً لاختياركم خدماتنا. أرسلوا لنا القطعة الفاخرة التي تحبونها، ونؤكد معكم كل التفاصيل ونطلعكم على مستجدات طلبكم حتى يصل إليكم.',
+'Licensed by the Department of Economic Development · Delivery inside and outside the UAE':'مرخّص من دائرة التنمية الاقتصادية · توصيل داخل الدولة وخارجها',
+'15,000+':'+15,000','customers served':'عميل تمت خدمتهم','Under 24h':'أقل من 24 ساعة','delivery':'توصيل','original products':'منتجات أصلية',
+'Log in':'تسجيل الدخول','Register':'إنشاء حساب','Create account':'إنشاء الحساب','Your name':'الاسم','Phone number':'رقم الجوال','Password':'كلمة المرور','At least 6 characters':'6 أحرف على الأقل',
+'Add a product or follow your orders.':'أضف منتجاً أو تابع طلباتك.','Log out':'تسجيل الخروج','New order':'طلب جديد','My orders':'طلباتي',
+'Photo of the product':'صورة المنتج','Brand':'الماركة','e.g. Gucci':'مثال: Gucci','Product details (optional)':'تفاصيل المنتج (اختياري)','e.g. small shoulder bag':'مثال: حقيبة كتف صغيرة',
+'Size':'المقاس','e.g. 38':'مثال: 38','Color':'اللون','e.g. Black':'مثال: أسود','WhatsApp number':'رقم الواتساب','Notes (optional)':'ملاحظات (اختياري)','Send order':'إرسال الطلب',
+'Contact us':'تواصل معنا','We’re happy to help with any question.':'يسعدنا مساعدتكم في أي استفسار.',
+'Kindly log in to place a new order or view your purchases. New here? Tap Register to create your account in seconds.':'يرجى تسجيل الدخول لتقديم طلب جديد أو عرض مشترياتك. إذا كنت جديداً، اضغط «إنشاء حساب» لتسجيل حسابك في ثوانٍ.',
+'Welcome! Create your account to place orders and follow every step until delivery.':'أهلاً بك! أنشئ حسابك لتقديم الطلبات ومتابعة كل خطوة حتى التوصيل.',
+'Enter a valid phone number':'أدخل رقم جوال صحيحاً','Password needs at least 6 characters':'كلمة المرور 6 أحرف على الأقل','Please enter your name':'الرجاء إدخال الاسم',
+'This number is already registered. Please log in.':'هذا الرقم مسجّل مسبقاً. الرجاء تسجيل الدخول.','Account created. Please log in.':'تم إنشاء الحساب. الرجاء تسجيل الدخول.',
+'Wrong phone number or password':'رقم الجوال أو كلمة المرور غير صحيحة','Connection problem. Try again.':'مشكلة في الاتصال. حاول مرة أخرى.',
+'Please add a photo of the product':'الرجاء إضافة صورة المنتج','Please enter the brand':'الرجاء إدخال الماركة','Enter your WhatsApp number':'أدخل رقم الواتساب',
+'Sending…':'جارٍ الإرسال…','Order sent. We’ll message you soon.':'تم إرسال الطلب. سنتواصل معك قريباً.','Could not send':'تعذّر الإرسال',
+'No orders yet. Add your first one in “New order”.':'لا توجد طلبات بعد. أضف أول طلب من «طلب جديد».','In progress':'قيد التنفيذ','Purchase history':'سجل المشتريات','No photo':'بلا صورة','Order':'طلب',
+'Requested':'تم الطلب','Waiting for payment':'بانتظار الدفع','Paid':'تم الدفع','Delivery':'التوصيل'};
+function tr(s){return lang==='ar'&&AR[s]?AR[s]:s}
+function applyLang(){
+  document.documentElement.lang=lang;document.documentElement.dir=lang==='ar'?'rtl':'ltr';
+  var skip=['a-msg','a-go','hi','o-go','toast','lang'];
+  document.querySelectorAll('body *').forEach(function(el){
+    if(skip.indexOf(el.id)>-1)return;
+    if(el.children.length===0&&el.childNodes.length===1&&el.firstChild.nodeType===3){
+      var k=el.dataset.en||el.textContent.trim();
+      if(AR[k]!==undefined){el.dataset.en=k;el.textContent=lang==='ar'?AR[k]:k}}
+    if(el.placeholder){var p=el.dataset.enph||el.placeholder;if(AR[p]!==undefined){el.dataset.enph=p;el.placeholder=lang==='ar'?AR[p]:p}}
+  });
+  $('a-go').textContent=tr(mode==='register'?'Create account':'Log in');
+  $('a-msg').textContent=tr(MSG[mode]);
+  $('o-go').textContent=tr('Send order');
+  $('lang').textContent=lang==='ar'?'English':'العربية';
+  if(session){var mm=session.user.user_metadata||{};$('hi').textContent=tr('Welcome')+(mm.name?(lang==='ar'?'، ':', ')+mm.name:'')}
+}
 var MSG={login:'Kindly log in to place a new order or view your purchases. New here? Tap Register to create your account in seconds.',register:'Welcome! Create your account to place orders and follow every step until delivery.'};
 var STAGES=['Requested','Waiting for payment','Paid','Delivery'];
 var $=function(i){return document.getElementById(i)},session=null,mode='login',imgData='',urls={};
 function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]})}
-function toast(t){var e=$('toast');e.textContent=t;e.classList.add('on');setTimeout(function(){e.classList.remove('on')},3000)}
+function toast(t){var e=$('toast');e.textContent=tr(t);e.classList.add('on');setTimeout(function(){e.classList.remove('on')},3000)}
 function digits(p){var d=String(p||'').replace(/\D/g,'');if(d.indexOf('00')===0)d=d.slice(2);else if(d.charAt(0)==='0')d='971'+d.slice(1);return d}
 function mail(p){return digits(p)+'@customers.shopperdesk.app'}
 
 document.addEventListener('click',function(e){
   var t=e.target.closest('button');if(!t)return;
-  if(t.dataset.mode){mode=t.dataset.mode;$('a-msg').textContent=MSG[mode];document.querySelectorAll('[data-mode]').forEach(function(b){b.setAttribute('aria-pressed',b===t)});
-    $('a-name').hidden=mode!=='register';$('a-go').textContent=mode==='register'?'Create account':'Log in';
+  if(t.dataset.mode){mode=t.dataset.mode;$('a-msg').textContent=tr(MSG[mode]);document.querySelectorAll('[data-mode]').forEach(function(b){b.setAttribute('aria-pressed',b===t)});
+    $('a-name').hidden=mode!=='register';$('a-go').textContent=tr(mode==='register'?'Create account':'Log in');
     $('a-pw').autocomplete=mode==='register'?'new-password':'current-password'}
   if(t.dataset.view){document.querySelectorAll('[data-view]').forEach(function(b){b.setAttribute('aria-pressed',b===t)});
     $('v-new').hidden=t.dataset.view!=='new';$('v-mine').hidden=t.dataset.view!=='mine';if(t.dataset.view==='mine')load()}
@@ -174,7 +214,7 @@ $('o-go').onclick=async function(){
   if(!imgData){toast('Please add a photo of the product');return}
   if(!v('brand')){toast('Please enter the brand');return}
   if(digits(v('ph')).length<10){toast('Enter your WhatsApp number');return}
-  b.disabled=true;b.textContent='Sending…';
+  b.disabled=true;b.textContent=tr('Sending…');
   try{
     var u=session.user,path=u.id+'/'+Date.now()+'.jpg';
     var blob=await (await fetch(imgData)).blob();
@@ -186,8 +226,8 @@ $('o-go').onclick=async function(){
     ['brand','prod','size','color','note'].forEach(function(k){$('o-'+k).value=''});$('o-img').value='';imgData='';$('o-prev').style.display='none';
     toast('Order sent. We’ll message you soon.');
     document.querySelector('[data-view="mine"]').click();
-  }catch(er){toast('Could not send: '+er.message)}
-  b.disabled=false;b.textContent='Send order';
+  }catch(er){toast(tr('Could not send')+': '+er.message)}
+  b.disabled=false;b.textContent=tr('Send order');
 };
 
 async function load(){
@@ -196,22 +236,24 @@ async function load(){
   var o=r.data,paths=o.filter(function(x){return x.image_path}).map(function(x){return x.image_path});urls={};
   if(paths.length){var s=await sb.storage.from('screenshots').createSignedUrls(paths,3600);(s.data||[]).forEach(function(x){if(x.signedUrl)urls[x.path]=x.signedUrl})}
   var act=o.filter(function(x){return x.stage<3}),his=o.filter(function(x){return x.stage>=3});
-  $('list').innerHTML=(o.length?'':'<div class="empty">No orders yet. Add your first one in “New order”.</div>')
-    +(act.length?'<h2>In progress</h2>'+act.map(card).join(''):'')+(his.length?'<h2>Purchase history</h2>'+his.map(card).join(''):'');
+  $('list').innerHTML=(o.length?'':'<div class="empty">'+tr('No orders yet. Add your first one in “New order”.')+'</div>')
+    +(act.length?'<h2>'+tr('In progress')+'</h2>'+act.map(card).join(''):'')+(his.length?'<h2>'+tr('Purchase history')+'</h2>'+his.map(card).join(''):'');
 }
 function card(o){
-  var st=Math.min(o.stage,3),u=urls[o.image_path],th=u?'<img class="thumb" alt="Product" src="'+esc(u)+'">':'<div class="thumb">No photo</div>';
+  var st=Math.min(o.stage,3),u=urls[o.image_path],th=u?'<img class="thumb" alt="Product" src="'+esc(u)+'">':'<div class="thumb">'+tr('No photo')+'</div>';
   var steps='<div class="steps">'+STAGES.map(function(s,i){return '<i class="'+(i<=st?'on':'')+'"></i>'}).join('')+'</div>';
-  return '<div class="card">'+th+'<div class="body"><div class="name">Order #'+o.id+' · '+esc((o.brand||'')+(o.product?' · '+o.product:''))+'</div>'
-   +'<div class="meta">'+[o.size?'Size '+esc(o.size):'',o.color?esc(o.color):'',new Date(o.created_at).toLocaleDateString()].filter(Boolean).join(' · ')+'</div>'
-   +steps+'<div class="state">'+STAGES[st]+'</div></div></div>';
+  return '<div class="card">'+th+'<div class="body"><div class="name">'+tr('Order')+' #'+o.id+' · '+esc((o.brand||'')+(o.product?' · '+o.product:''))+'</div>'
+   +'<div class="meta">'+[o.size?tr('Size')+' '+esc(o.size):'',o.color?esc(o.color):'',new Date(o.created_at).toLocaleDateString(lang==='ar'?'ar-AE':undefined)].filter(Boolean).join(' · ')+'</div>'
+   +steps+'<div class="state">'+tr(STAGES[st])+'</div></div></div>';
 }
 
 function show(){
   $('auth').hidden=!!session;$('app').hidden=!session;
-  if(session){var m=session.user.user_metadata||{};$('hi').textContent='Welcome'+(m.name?', '+m.name:'');$('o-ph').value=m.phone||''}
+  if(session){var m=session.user.user_metadata||{};$('hi').textContent=tr('Welcome')+(m.name?(lang==='ar'?'، ':', ')+m.name:'');$('o-ph').value=m.phone||''}
 }
 sb.auth.onAuthStateChange(function(ev,s){var was=!!session;session=s;if(!!s!==was)show()});
+$('lang').onclick=function(){lang=lang==='ar'?'en':'ar';try{localStorage.setItem('lang',lang)}catch(e){}applyLang();if(session)load()};
+applyLang();
 sb.auth.getSession().then(function(r){session=r.data.session;show()});
 </script>
 </body>
