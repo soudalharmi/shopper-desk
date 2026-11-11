@@ -66,6 +66,9 @@ input:focus,textarea:focus{outline:none;border-color:var(--ink);background:var(-
 .stagesel option{color:initial}
 .note{font-size:13px;background:var(--fill);padding:6px 10px;border-radius:10px;margin:8px 0 2px;overflow-wrap:anywhere}
 .note.mine{background:var(--warnbg);color:var(--warn)}
+button.note{display:block;width:100%;text-align:start;border:0;font:inherit;font-size:13px;cursor:pointer}
+.stagesel.s4{color:var(--warn)}
+.card.rej{opacity:.72}
 </style>
 </head>
 <body>
@@ -84,7 +87,7 @@ input:focus,textarea:focus{outline:none;border-color:var(--ink);background:var(-
     <button class="tab" data-view="orders" aria-pressed="true">Orders</button>
     <button class="tab" data-view="stores" aria-pressed="false">Shopping list</button>
   </div>
-  <input id="q" class="search" type="search" placeholder="Search phone, order # or name" autocomplete="off">
+  <input id="q" class="search" type="search" placeholder="Search phone, order number or name" autocomplete="off">
   <div class="chips" id="chips"></div>
   <div id="list"></div>
   <button class="fab" id="add">+ New order</button>
@@ -122,13 +125,19 @@ input:focus,textarea:focus{outline:none;border-color:var(--ink);background:var(-
   <label for="t-text">Message</label><textarea id="t-text" rows="6" dir="auto"></textarea>
   <div class="acts" style="margin-top:16px;justify-content:flex-end"><button class="btn" id="t-cancel">Cancel</button><button class="btn main" id="t-save">Save</button></div>
 </dialog>
+<dialog id="dlgN">
+  <h2 style="margin:0 0 4px;font:700 22px/1.2 -apple-system,Inter,sans-serif">Private note</h2>
+  <p style="color:var(--mute);font-size:14px;margin:4px 0 0">Only you can see this note. Leave it empty and save to remove it.</p>
+  <label for="n-text">Note</label><textarea id="n-text" rows="5" dir="auto"></textarea>
+  <div class="acts" style="margin-top:16px;justify-content:flex-end"><button class="btn" id="n-cancel">Cancel</button><button class="btn main" id="n-save">Save</button></div>
+</dialog>
 <div class="toast" id="toast"></div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
 <script>
 var SB_URL='https://gpyyossbvpcfwrvueuls.supabase.co',SB_KEY='sb_publishable_tv9IbZhQF_huqXX_Dh15PQ_LBxsTZ_c',FN='ingest';
 var sb=supabase.createClient(SB_URL,SB_KEY);
-var STAGES=['Requested','Waiting for payment','Paid','Delivery'];
+var STAGES=['Requested','Waiting for payment','Paid','Delivery','Rejected'];
 var orders=[],urls={},view='orders',filter='All',imgData='',editId=null,session=null;
 var $=function(i){return document.getElementById(i)};
 function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]})}
@@ -139,11 +148,13 @@ function wa(o,t){return 'https://wa.me/'+waNum(o.customer_phone)+'?text='+encode
 function chat(o){return 'https://wa.me/'+waNum(o.customer_phone)}
 function who(o){return o.customer_name||'there'}
 function ask(o){return 'Hi '+who(o)+', I found your '+(o.brand||'')+' '+(o.product||'item')+'. Which '+missing(o).join(' and ')+' would you like?'}
-var tpl='',notes={};
+var ORDER_START=10000;
+function orderNo(o){return new Date(o.created_at).getFullYear()+'-'+(ORDER_START+o.id)}
+var tpl='',notes={},noteId=null;
 var DEFTPL='Hi {name}, your order #{order} ({brand} {product}, size {size}, {color}) is confirmed. Total: AED {price}. Pay here: [payment link]';
-function fill(o){return (tpl||DEFTPL).replace(/\{(\w+)\}/g,function(_,k){var m={name:o.customer_name||'',brand:o.brand||'',product:o.product||'',size:o.size||'-',color:o.color||'-',price:o.price||0,order:o.id,phone:o.customer_phone||''};return k in m?m[k]:'{'+k+'}'})}
+function fill(o){return (tpl||DEFTPL).replace(/\{(\w+)\}/g,function(_,k){var m={name:o.customer_name||'',brand:o.brand||'',product:o.product||'',size:o.size||'-',color:o.color||'-',price:o.price||0,order:orderNo(o),phone:o.customer_phone||''};return k in m?m[k]:'{'+k+'}'})}
 function match(o){var q=($('q').value||'').trim().toLowerCase();if(!q)return true;var d=q.replace(/\D/g,''),ph=String(o.customer_phone||'');
-  return String(o.id)===q.replace('#','')||(d.length>=4&&(ph.indexOf(d)>-1||ph.indexOf(waNum(q))>-1))||String(o.customer_name||'').toLowerCase().indexOf(q)>-1}
+  return (d.length>=4&&orderNo(o).indexOf(q.replace('#',''))>-1)||(d.length>=4&&(ph.indexOf(d)>-1||ph.indexOf(waNum(q))>-1))||String(o.customer_name||'').toLowerCase().indexOf(q)>-1}
 async function loadExtras(){
   var n=await sb.from('order_notes').select('order_id,note');notes={};(n.data||[]).forEach(function(x){notes[x.order_id]=x.note});
   var r=await sb.from('shoppers').select('payment_template').eq('id',session.user.id).maybeSingle();tpl=(r.data&&r.data.payment_template)||'';
@@ -159,19 +170,19 @@ async function load(){
   render();
 }
 function card(o){
-  var st=Math.min(o.stage,3),m=missing(o),u=urls[o.image_path];
+  var st=Math.min(o.stage,4),m=missing(o),u=urls[o.image_path];
   var th=u?'<img class="thumb" alt="Screenshot" src="'+esc(u)+'">':'<div class="thumb">No photo</div>';
   var a='';
   if(m.length&&o.customer_phone&&st<3)a+='<a class="btn main" target="_blank" rel="noopener" href="'+wa(o,ask(o))+'">Ask '+m.join(' + ')+'</a>';
   if(o.customer_phone)a+='<a class="btn chat" target="_blank" rel="noopener" href="'+chat(o)+'">Chat</a>';
   if(st<2)a+='<a class="btn main" target="_blank" rel="noopener" href="'+wa(o,fill(o))+'">Payment message</a>';
-  a+='<button class="btn" data-a="note" data-id="'+o.id+'">Note</button><button class="btn" data-a="edit" data-id="'+o.id+'">Edit</button><button class="btn del" data-a="del" data-id="'+o.id+'">Remove</button>';
+  a+='<button class="btn" data-a="note" data-id="'+o.id+'">'+(notes[o.id]?'Edit note':'Add note')+'</button><button class="btn" data-a="edit" data-id="'+o.id+'">Edit</button>'+(st<4?'<button class="btn del" data-a="reject" data-id="'+o.id+'">Reject</button>':'')+'<button class="btn del" data-a="del" data-id="'+o.id+'">Delete</button>';
   var sel='<select class="stagesel s'+st+'" data-a="stage" data-id="'+o.id+'" aria-label="Status">'+STAGES.map(function(x,i){return '<option value="'+i+'"'+(i===st?' selected':'')+'>'+x+'</option>'}).join('')+'</select>';
-  return '<div class="card">'+th+'<div class="body"><div class="top"><span class="name">'+esc(o.product||'Item (add details)')+'</span><span class="price">AED '+esc(o.price||0)+'</span></div>'
-   +'<div class="meta">#'+o.id+' · '+esc(o.customer_name||'No name')+' · '+esc(o.brand||'Brand?')+(o.size?' · '+esc(o.size):'')+(o.color?' · '+esc(o.color):'')+(o.customer_phone?' · '+esc(o.customer_phone):'')+'</div>'
+  return '<div class="card'+(st===4?' rej':'')+'">'+th+'<div class="body"><div class="top"><span class="name">'+esc(o.product||'Item (add details)')+'</span><span class="price">AED '+esc(o.price||0)+'</span></div>'
+   +'<div class="meta">#'+orderNo(o)+' · '+esc(o.customer_name||'No name')+' · '+esc(o.brand||'Brand?')+(o.size?' · '+esc(o.size):'')+(o.color?' · '+esc(o.color):'')+(o.customer_phone?' · '+esc(o.customer_phone):'')+'</div>'
    +sel+(m.length&&st<3?'<div class="miss">Still needed: '+m.join(', ')+'</div>':'')
    +(o.raw_message?'<div class="note">Customer: '+esc(o.raw_message)+'</div>':'')
-   +(notes[o.id]?'<div class="note mine">Private: '+esc(notes[o.id])+'</div>':'')
+   +(notes[o.id]?'<button class="note mine" data-a="note" data-id="'+o.id+'">Private note: '+esc(notes[o.id])+'</button>':'')
    +'<div class="acts">'+a+'</div></div></div>'}
 function render(){
   var c='<button class="chip" data-f="All" aria-pressed="'+(filter==='All')+'">All ('+orders.length+')</button>';
@@ -197,10 +208,12 @@ document.addEventListener('click',async function(e){
   if(t.dataset.f!==undefined){filter=t.dataset.f;render();return}
   var o=orders.filter(function(x){return String(x.id)===t.dataset.id})[0];if(!o)return;
   if(t.dataset.a==='next'){var r=await sb.from('orders').update({stage:o.stage+1}).eq('id',o.id);if(r.error)toast(r.error.message);load()}
-  if(t.dataset.a==='del'){if(!confirm('Remove this order?'))return;await sb.from('orders').delete().eq('id',o.id);load()}
+  if(t.dataset.a==='del'){if(!confirm('Delete this order permanently? The customer will no longer see it either.'))return;await sb.from('orders').delete().eq('id',o.id);load()}
   if(t.dataset.a==='pay'){try{await navigator.clipboard.writeText(pay(o));toast('Message copied')}catch(er){toast('Copy not allowed here')}}
   if(t.dataset.a==='edit'){openDlg(o)}
-  if(t.dataset.a==='note'){var v=prompt('Private note (only you can see it)',notes[o.id]||'');if(v!==null){var nr=await sb.from('order_notes').upsert({order_id:o.id,shopper_id:session.user.id,note:v});if(nr.error)toast(nr.error.message);load()}}
+  if(t.dataset.a==='note'){noteId=o.id;$('n-text').value=notes[o.id]||'';$('dlgN').showModal()}
+  if(t.dataset.a==='reject'){var why=prompt('Reason for rejecting (the customer will see it). Leave empty for none.','');if(why===null)return;
+    var rr=await sb.from('orders').update({stage:4,reject_reason:why.trim()||null}).eq('id',o.id);if(rr.error)toast(rr.error.message);load()}
 });
 
 function openDlg(o){
@@ -249,8 +262,17 @@ $('l-go').onclick=async function(){
 };
 $('out').onclick=function(){sb.auth.signOut()};
 $('q').oninput=render;
+$('n-cancel').onclick=function(){$('dlgN').close()};
+$('n-save').onclick=async function(){var txt=$('n-text').value.trim(),r;
+  if(txt)r=await sb.from('order_notes').upsert({order_id:noteId,shopper_id:session.user.id,note:txt});
+  else r=await sb.from('order_notes').delete().eq('order_id',noteId);
+  if(r.error){toast(r.error.message);return}
+  if(txt)notes[noteId]=txt;else delete notes[noteId];$('dlgN').close();render();toast('Note saved')};
 document.addEventListener('change',async function(e){var t=e.target;if(!t.dataset||t.dataset.a!=='stage')return;
-  var r=await sb.from('orders').update({stage:+t.value}).eq('id',+t.dataset.id);if(r.error)toast(r.error.message);load()});
+  var v=+t.value,o0=orders.filter(function(x){return String(x.id)===t.dataset.id})[0],u={stage:v};
+  if(v===4){var why=prompt('Reason for rejecting (the customer will see it). Leave empty for none.','');if(why===null){load();return}u.reject_reason=why.trim()||null}
+  else if(o0&&o0.stage===4)u.reject_reason=null;
+  var r=await sb.from('orders').update(u).eq('id',+t.dataset.id);if(r.error)toast(r.error.message);load()});
 $('tplb').onclick=function(){$('t-text').value=tpl||DEFTPL;$('dlg2').showModal()};
 $('t-cancel').onclick=function(){$('dlg2').close()};
 $('t-save').onclick=async function(){var r=await sb.from('shoppers').update({payment_template:$('t-text').value}).eq('id',session.user.id);
