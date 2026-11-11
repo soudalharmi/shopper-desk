@@ -60,6 +60,12 @@ input:focus,textarea:focus{outline:none;border-color:var(--ink);background:var(-
 .toast.on{opacity:1}
 :focus-visible{outline:2px solid var(--s3);outline-offset:2px}
 @media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+.search{margin-bottom:12px;border-radius:14px}
+.stagesel{appearance:none;-webkit-appearance:none;border:0;background:var(--fill);color:var(--ink);font:inherit;font-size:13px;font-weight:600;padding:5px 14px;border-radius:99px;cursor:pointer;margin:2px 0}
+.stagesel.s1{color:var(--s1)}.stagesel.s2{color:var(--s2)}.stagesel.s3{color:var(--s3)}
+.stagesel option{color:initial}
+.note{font-size:13px;background:var(--fill);padding:6px 10px;border-radius:10px;margin:8px 0 2px;overflow-wrap:anywhere}
+.note.mine{background:var(--warnbg);color:var(--warn)}
 </style>
 </head>
 <body>
@@ -73,11 +79,12 @@ input:focus,textarea:focus{outline:none;border-color:var(--ink);background:var(-
 
 <main id="desk" hidden>
   <div class="head"><div><h1>Shopper Desk</h1><p class="sub">Every order, customer and status in one place.</p></div>
-  <button class="btn" id="out">Log out</button></div>
+  <div class="acts" style="margin:0;flex-wrap:nowrap"><button class="btn" id="tplb">Message</button><button class="btn" id="out">Log out</button></div></div>
   <div class="tabs">
     <button class="tab" data-view="orders" aria-pressed="true">Orders</button>
     <button class="tab" data-view="stores" aria-pressed="false">Shopping list</button>
   </div>
+  <input id="q" class="search" type="search" placeholder="Search phone, order # or name" autocomplete="off">
   <div class="chips" id="chips"></div>
   <div id="list"></div>
   <button class="fab" id="add">+ New order</button>
@@ -86,8 +93,8 @@ input:focus,textarea:focus{outline:none;border-color:var(--ink);background:var(-
 <dialog id="dlg">
   <h2 id="d-title" style="margin:0 0 4px;font:600 20px Georgia,serif">New order</h2>
   <div class="newonly">
-    <label for="f-img">Customer’s screenshot</label><input type="file" id="f-img" accept="image/*">
-    <label for="f-msg">Customer’s message (optional)</label><textarea id="f-msg" rows="3" placeholder="Paste what they wrote, e.g. size 38 in black"></textarea>
+    <label for="f-img">Photo of the product (optional)</label><input type="file" id="f-img" accept="image/*">
+    <label for="f-msg">Customer note (optional)</label><textarea id="f-msg" rows="3" placeholder="Anything the customer asked for"></textarea>
   </div>
   <div class="row">
     <div><label for="f-cust">Customer</label><input id="f-cust"></div>
@@ -109,6 +116,12 @@ input:focus,textarea:focus{outline:none;border-color:var(--ink);background:var(-
     <button class="btn main" id="save">Add order</button>
   </div>
 </dialog>
+<dialog id="dlg2">
+  <h2 style="margin:0 0 4px;font:700 22px/1.2 -apple-system,Inter,sans-serif">Payment message</h2>
+  <p class="hint" style="color:var(--mute);font-size:14px;margin:4px 0 0">This text opens in WhatsApp when you tap “Payment message”. You can use {name} {brand} {product} {size} {color} {price} {order}.</p>
+  <label for="t-text">Message</label><textarea id="t-text" rows="6" dir="auto"></textarea>
+  <div class="acts" style="margin-top:16px;justify-content:flex-end"><button class="btn" id="t-cancel">Cancel</button><button class="btn main" id="t-save">Save</button></div>
+</dialog>
 <div class="toast" id="toast"></div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
@@ -126,30 +139,39 @@ function wa(o,t){return 'https://wa.me/'+waNum(o.customer_phone)+'?text='+encode
 function chat(o){return 'https://wa.me/'+waNum(o.customer_phone)}
 function who(o){return o.customer_name||'there'}
 function ask(o){return 'Hi '+who(o)+', I found your '+(o.brand||'')+' '+(o.product||'item')+'. Which '+missing(o).join(' and ')+' would you like?'}
-function pay(o){return 'Hi '+who(o)+', your '+(o.brand||'')+' '+(o.product||'item')+(o.size?' (size '+o.size+')':'')+(o.color?' in '+o.color:'')+' is confirmed: AED '+(o.price||0)+'. Pay here: [paste your payment link]'}
+var tpl='',notes={};
+var DEFTPL='Hi {name}, your order #{order} ({brand} {product}, size {size}, {color}) is confirmed. Total: AED {price}. Pay here: [payment link]';
+function fill(o){return (tpl||DEFTPL).replace(/\{(\w+)\}/g,function(_,k){var m={name:o.customer_name||'',brand:o.brand||'',product:o.product||'',size:o.size||'-',color:o.color||'-',price:o.price||0,order:o.id,phone:o.customer_phone||''};return k in m?m[k]:'{'+k+'}'})}
+function match(o){var q=($('q').value||'').trim().toLowerCase();if(!q)return true;var d=q.replace(/\D/g,''),ph=String(o.customer_phone||'');
+  return String(o.id)===q.replace('#','')||(d.length>=4&&(ph.indexOf(d)>-1||ph.indexOf(waNum(q))>-1))||String(o.customer_name||'').toLowerCase().indexOf(q)>-1}
+async function loadExtras(){
+  var n=await sb.from('order_notes').select('order_id,note');notes={};(n.data||[]).forEach(function(x){notes[x.order_id]=x.note});
+  var r=await sb.from('shoppers').select('payment_template').eq('id',session.user.id).maybeSingle();tpl=(r.data&&r.data.payment_template)||'';
+}
 
 async function load(){
   var r=await sb.from('orders').select('*').order('created_at',{ascending:false});
   if(r.error){toast(r.error.message);return}
-  orders=r.data;urls={};
+  orders=r.data;urls={};await loadExtras();
   var paths=orders.filter(function(o){return o.image_path}).map(function(o){return o.image_path});
   if(paths.length){var s=await sb.storage.from('screenshots').createSignedUrls(paths,3600);
     (s.data||[]).forEach(function(x){if(x.signedUrl)urls[x.path]=x.signedUrl})}
   render();
 }
 function card(o){
-  var st=Math.min(o.stage,3),m=missing(o),last=st===3,u=urls[o.image_path];
+  var st=Math.min(o.stage,3),m=missing(o),u=urls[o.image_path];
   var th=u?'<img class="thumb" alt="Screenshot" src="'+esc(u)+'">':'<div class="thumb">No photo</div>';
   var a='';
-  if(m.length&&o.customer_phone&&!last)a+='<a class="btn main" target="_blank" rel="noopener" href="'+wa(o,ask(o))+'">Ask '+m.join(' + ')+'</a>';
+  if(m.length&&o.customer_phone&&st<3)a+='<a class="btn main" target="_blank" rel="noopener" href="'+wa(o,ask(o))+'">Ask '+m.join(' + ')+'</a>';
   if(o.customer_phone)a+='<a class="btn chat" target="_blank" rel="noopener" href="'+chat(o)+'">Chat</a>';
-  if(!m.length&&st<2)a+='<button class="btn main" data-a="pay" data-id="'+o.id+'">Copy payment message</button>';
-  if(!last)a+='<button class="btn" data-a="next" data-id="'+o.id+'">Mark '+STAGES[st+1].toLowerCase()+'</button>';
-  a+='<button class="btn" data-a="edit" data-id="'+o.id+'">Edit</button><button class="btn del" data-a="del" data-id="'+o.id+'">Remove</button>';
+  if(st<2)a+='<a class="btn main" target="_blank" rel="noopener" href="'+wa(o,fill(o))+'">Payment message</a>';
+  a+='<button class="btn" data-a="note" data-id="'+o.id+'">Note</button><button class="btn" data-a="edit" data-id="'+o.id+'">Edit</button><button class="btn del" data-a="del" data-id="'+o.id+'">Remove</button>';
+  var sel='<select class="stagesel s'+st+'" data-a="stage" data-id="'+o.id+'" aria-label="Status">'+STAGES.map(function(x,i){return '<option value="'+i+'"'+(i===st?' selected':'')+'>'+x+'</option>'}).join('')+'</select>';
   return '<div class="card">'+th+'<div class="body"><div class="top"><span class="name">'+esc(o.product||'Item (add details)')+'</span><span class="price">AED '+esc(o.price||0)+'</span></div>'
-   +'<div class="meta">'+esc(o.customer_name||'No name')+' · '+esc(o.brand||'Brand?')+(o.size?' · '+esc(o.size):'')+(o.color?' · '+esc(o.color):'')+'</div>'
-   +'<span class="badge s'+st+'">'+STAGES[st]+'</span>'
-   +(m.length&&!last?'<div class="miss">Still needed: '+m.join(', ')+'</div>':'')
+   +'<div class="meta">#'+o.id+' · '+esc(o.customer_name||'No name')+' · '+esc(o.brand||'Brand?')+(o.size?' · '+esc(o.size):'')+(o.color?' · '+esc(o.color):'')+(o.customer_phone?' · '+esc(o.customer_phone):'')+'</div>'
+   +sel+(m.length&&st<3?'<div class="miss">Still needed: '+m.join(', ')+'</div>':'')
+   +(o.raw_message?'<div class="note">Customer: '+esc(o.raw_message)+'</div>':'')
+   +(notes[o.id]?'<div class="note mine">Private: '+esc(notes[o.id])+'</div>':'')
    +'<div class="acts">'+a+'</div></div></div>'}
 function render(){
   var c='<button class="chip" data-f="All" aria-pressed="'+(filter==='All')+'">All ('+orders.length+')</button>';
@@ -158,7 +180,7 @@ function render(){
   $('chips').style.display=view==='orders'?'flex':'none';$('chips').innerHTML=c;
   var out='';
   if(view==='orders'){
-    var f=orders.filter(function(o){return filter==='All'||String(o.stage)===String(filter)});
+    var f=orders.filter(function(o){return (filter==='All'||String(o.stage)===String(filter))&&match(o)});
     out=f.length?f.map(card).join(''):'<div class="empty">No orders here yet. Tap “New order” to add one.</div>';
   }else{
     var by={};orders.filter(function(o){return o.stage<3}).forEach(function(o){var b=o.brand||'Other';(by[b]=by[b]||[]).push(o)});
@@ -178,12 +200,13 @@ document.addEventListener('click',async function(e){
   if(t.dataset.a==='del'){if(!confirm('Remove this order?'))return;await sb.from('orders').delete().eq('id',o.id);load()}
   if(t.dataset.a==='pay'){try{await navigator.clipboard.writeText(pay(o));toast('Message copied')}catch(er){toast('Copy not allowed here')}}
   if(t.dataset.a==='edit'){openDlg(o)}
+  if(t.dataset.a==='note'){var v=prompt('Private note (only you can see it)',notes[o.id]||'');if(v!==null){var nr=await sb.from('order_notes').upsert({order_id:o.id,shopper_id:session.user.id,note:v});if(nr.error)toast(nr.error.message);load()}}
 });
 
 function openDlg(o){
   editId=o?o.id:null;imgData='';
   document.querySelectorAll('.newonly').forEach(function(x){x.hidden=!!o});
-  document.querySelectorAll('.editonly').forEach(function(x){x.hidden=!o});
+  document.querySelectorAll('.editonly').forEach(function(x){x.hidden=false});
   $('d-title').textContent=o?'Edit order':'New order';$('save').textContent=o?'Save changes':'Add order';
   $('f-img').value='';$('f-msg').value='';
   $('f-cust').value=o?o.customer_name||'':'';$('f-ph').value=o?o.customer_phone||'':'';
@@ -207,15 +230,17 @@ $('save').onclick=async function(){
       var r=await sb.from('orders').update({customer_name:v('cust')||null,customer_phone:v('ph')||null,brand:v('brand')||null,product:v('prod')||null,size:v('size')||null,color:v('color')||null,price:parseFloat(v('price'))||null}).eq('id',editId);
       if(r.error)throw new Error(r.error.message);
     }else{
-      if(!imgData&&!v('msg')){toast('Add a screenshot or the customer’s message');b.disabled=false;return}
-      b.textContent='Reading…';
-      var res=await fetch(SB_URL+'/functions/v1/'+FN,{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+session.access_token,apikey:SB_KEY},
-        body:JSON.stringify({image_base64:imgData?imgData.split(',')[1]:null,media_type:'image/jpeg',message:v('msg'),customer_name:v('cust'),customer_phone:v('ph')})});
-      var d=await res.json();if(!res.ok)throw new Error(d.error||'Server error');
+      if(!v('cust')&&!v('brand')&&!imgData){toast('Add a photo, a customer or a brand');b.disabled=false;return}
+      b.textContent='Saving…';
+      var path=null;
+      if(imgData){path=session.user.id+'/'+Date.now()+'.jpg';var blob=await (await fetch(imgData)).blob();
+        var up=await sb.storage.from('screenshots').upload(path,blob,{contentType:'image/jpeg'});if(up.error)throw new Error(up.error.message)}
+      var ins=await sb.from('orders').insert({shopper_id:session.user.id,customer_name:v('cust')||null,customer_phone:v('ph')||null,brand:v('brand')||null,product:v('prod')||null,size:v('size')||null,color:v('color')||null,price:parseFloat(v('price'))||null,raw_message:v('msg')||null,image_path:path,stage:0});
+      if(ins.error)throw new Error(ins.error.message);
     }
     $('dlg').close();await load();
   }catch(er){toast('Could not save: '+er.message)}
-  b.disabled=false;
+  b.disabled=false;b.textContent=editId?'Save changes':'Add order';
 };
 
 $('l-go').onclick=async function(){
@@ -223,6 +248,13 @@ $('l-go').onclick=async function(){
   if(r.error)toast('Login failed: '+r.error.message);
 };
 $('out').onclick=function(){sb.auth.signOut()};
+$('q').oninput=render;
+document.addEventListener('change',async function(e){var t=e.target;if(!t.dataset||t.dataset.a!=='stage')return;
+  var r=await sb.from('orders').update({stage:+t.value}).eq('id',+t.dataset.id);if(r.error)toast(r.error.message);load()});
+$('tplb').onclick=function(){$('t-text').value=tpl||DEFTPL;$('dlg2').showModal()};
+$('t-cancel').onclick=function(){$('dlg2').close()};
+$('t-save').onclick=async function(){var r=await sb.from('shoppers').update({payment_template:$('t-text').value}).eq('id',session.user.id);
+  if(r.error){toast(r.error.message);return}tpl=$('t-text').value;$('dlg2').close();render();toast('Saved')};
 function show(){$('login').hidden=!!session;$('desk').hidden=!session;if(session)load()}
 sb.auth.onAuthStateChange(function(ev,s){var was=!!session;session=s;if(!!s!==was)show()});
 sb.auth.getSession().then(function(r){session=r.data.session;show()});
